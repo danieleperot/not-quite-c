@@ -27,41 +27,50 @@ class Lexer:
     _tokens_iter: Generator[Optional[Token], None, None] = None
 
     _current: Token = Token()
+    _cursor: int = 0
 
     def __init__(self, content: str):
         self._content = content
+        self._tokens_iter = self._tokens()
 
     def next_token(self) -> Optional[Token]:
-        if self._tokens_iter is None:
-            self._tokens_iter = self._tokens()
-
         try:
             return next(self._tokens_iter)
         except StopIteration:
             return None
 
-    def _tokens(self) -> Generator[Optional[Token], None, None]:
+    def peek_token(self) -> Optional[Token]:
+        try:
+            current_cursor = self._cursor
+            token = next(self._tokens(self._cursor))
+            self._cursor = current_cursor
+
+            return token
+        except StopIteration:
+            return None
+
+    def _tokens(self, cursor: int = 0) -> Generator[Optional[Token], None, None]:
         self._current = Token()
         comment_type = None
-        i = 0
+        self._cursor = cursor
 
-        while i < len(self._content):
-            next_char = "" if i == len(self._content) else str(self._content[i])
+        while self._cursor < len(self._content):
+            next_char = "" if self._cursor == len(self._content) else str(self._content[self._cursor])
 
             if comment_type:
                 if next_char == "\n" and comment_type == self._CommentType.SINGLE_LINE:
                     comment_type = None
                 if next_char == "*" and comment_type == self._CommentType.MULTI_LINE:
-                    if i + 1 < len(self._content) and self._content[i + 1] == "/":
+                    if self._cursor + 1 < len(self._content) and self._content[self._cursor + 1] == "/":
                         comment_type = None
-                        i += 1
+                        self._cursor += 1
             elif next_char == "/":
-                if i + 1 < len(self._content) and self._content[i + 1] in ["/", "*"]:
+                if self._cursor + 1 < len(self._content) and self._content[self._cursor + 1] in ["/", "*"]:
                     yield from self._yield_token_and_reset()
                     comment_type = self._CommentType.SINGLE_LINE
-                    if self._content[i + 1] == "*":
+                    if self._content[self._cursor + 1] == "*":
                         comment_type = self._CommentType.MULTI_LINE
-                    i += 1
+                    self._cursor += 1
                 else:
                     yield from self._yield_symbol(next_char)
             elif next_char == '"':
@@ -79,8 +88,8 @@ class Lexer:
                 self._current.type = TokenType.FLOAT
                 self._current.value += next_char
             elif next_char == "=" and self._current.type != TokenType.STRING:
-                if i + 1 < len(self._content) and self._content[i + 1] == "=":
-                    i += 1
+                if self._cursor + 1 < len(self._content) and self._content[self._cursor + 1] == "=":
+                    self._cursor += 1
                     yield from self._yield_symbol("==", TokenType.SYMBOL_EQUALS)
                 else:
                     yield from self._yield_symbol(next_char)
@@ -89,8 +98,8 @@ class Lexer:
             else:
                 self._current.value += next_char
 
-            self._debug_step(comment_type, next_char, i)
-            i += 1
+            self._debug_step(comment_type, next_char, self._cursor)
+            self._cursor += 1
 
         if self._current.value:
             yield self._current

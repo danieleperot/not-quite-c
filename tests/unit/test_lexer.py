@@ -139,3 +139,29 @@ class TestLexer(unittest.TestCase):
         self._expect_token(lexer, TokenType.SYMBOL, "*")
         self._expect_token(lexer, TokenType.SYMBOL, "/")
         self.assertIsNone(lexer.next_token())
+
+
+class TestLexerPeek(unittest.TestCase):
+    def _expect_token(self, lexer: Lexer, t_type: TokenType, value: str):
+        token = lexer.next_token()
+
+        self.assertEqual(value, token.value)
+        self.assertEqual(t_type, token.type)
+
+    def _expect_token_peek(self, lexer: Lexer, t_type: TokenType, value: str):
+        token = lexer.peek_token()
+
+        self.assertEqual(value, token.value)
+        self.assertEqual(t_type, token.type)
+
+    def test_lexer_peek_does_not_consume_token(self):
+        lexer = Lexer("firstWord secondWord thirdWord")
+        self._expect_token_peek(lexer, TokenType.ID, "firstWord")
+        self._expect_token(lexer, TokenType.ID, "firstWord")
+        self._expect_token_peek(lexer, TokenType.ID, "secondWord")
+        self._expect_token(lexer, TokenType.ID, "secondWord")
+        self._expect_token_peek(lexer, TokenType.ID, "thirdWord")
+        self._expect_token(lexer, TokenType.ID, "thirdWord")
+
+        self.assertIsNone(lexer.peek_token())
+        self.assertIsNone(lexer.next_token())
