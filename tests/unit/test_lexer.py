@@ -6,8 +6,8 @@ from lexer import Lexer, TokenType
 class TestLexer(unittest.TestCase):
     def _expect_token(self, lexer: Lexer, t_type: TokenType, value: str):
         token = lexer.next_token()
-        self.assertEqual(t_type, token.type)
         self.assertEqual(value, token.value)
+        self.assertEqual(t_type, token.type)
 
     def test_lexer_with_no_content_returns_no_token(self):
         lexer = Lexer("")
@@ -47,8 +47,9 @@ class TestLexer(unittest.TestCase):
         self._expect_token(lexer, TokenType.STRING, "")
 
     def test_lexer_can_identify_string_literal_followed_by_id(self):
-        lexer = Lexer('"some string" someWord')
+        lexer = Lexer('firstWord "some string" someWord')
 
+        self._expect_token(lexer, TokenType.ID, "firstWord")
         self._expect_token(lexer, TokenType.STRING, "some string")
         self._expect_token(lexer, TokenType.ID, "someWord")
 
@@ -86,3 +87,25 @@ class TestLexer(unittest.TestCase):
         self._expect_token(lexer, TokenType.SYMBOL_EQUALS, "==")
         self._expect_token(lexer, TokenType.SYMBOL, "=")
 
+    def test_lexer_ignores_single_line_comments(self):
+        lexer = Lexer("someWord // this is a comment\n anotherWord")
+
+        self._expect_token(lexer, TokenType.ID, "someWord")
+        self._expect_token(lexer, TokenType.ID, "anotherWord")
+        self.assertIsNone(lexer.next_token())
+
+    def test_lexer_ignores_multi_line_comments(self):
+        lexer = Lexer("someWord/* this // (inline?) is \n\n a comment */anotherWord")
+
+        self._expect_token(lexer, TokenType.ID, "someWord")
+        self._expect_token(lexer, TokenType.ID, "anotherWord")
+        self.assertIsNone(lexer.next_token())
+
+        print('\n' * 3)
+
+        lexer = Lexer("someWord // this /* (inline?) is \n\n comment */")
+        self._expect_token(lexer, TokenType.ID, "someWord")
+        self._expect_token(lexer, TokenType.ID, "comment")
+        self._expect_token(lexer, TokenType.SYMBOL, "*")
+        self._expect_token(lexer, TokenType.SYMBOL, "/")
+        self.assertIsNone(lexer.next_token())
