@@ -21,7 +21,6 @@ class TestLexer(unittest.TestCase):
         self._expect_token(lexer, TokenType.ID, "someWord")
         self.assertIsNone(lexer.next_token())
 
-
     def test_lexer_loads_multiple_unquoted_words_as_id_tokens(self):
         lexer = Lexer("token1 token2 token3")
 
@@ -80,3 +79,10 @@ class TestLexer(unittest.TestCase):
 
         for symbol in KNOWN_SYMBOLS:
             self._expect_token(lexer, TokenType.SYMBOL, symbol)
+
+    def test_lexer_distinguishes_between_equal_and_assignment(self):
+        lexer = Lexer("== =")
+
+        self._expect_token(lexer, TokenType.SYMBOL_EQUALS, "==")
+        self._expect_token(lexer, TokenType.SYMBOL, "=")
+

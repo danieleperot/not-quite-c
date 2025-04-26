@@ -12,6 +12,7 @@ class TokenType(Enum):
     INTEGER = "INTEGER"
     FLOAT = "FLOAT"
     SYMBOL = "SYMBOL"
+    SYMBOL_EQUALS = "SYMBOL_EQUALS"
 
 
 @dataclass
@@ -54,6 +55,12 @@ class Lexer:
             elif next_char == "." and self._token_type == TokenType.INTEGER:
                 self._token_type = TokenType.FLOAT
                 self._token_value += next_char
+            elif next_char == "=" and self._token_type != TokenType.STRING:
+                if i + 1 < len(self._content) and self._content[i + 1] == "=":
+                    i += 1
+                    yield Token(type=TokenType.SYMBOL_EQUALS, value="==")
+                else:
+                    yield Token(type=TokenType.SYMBOL, value=next_char)
             elif next_char in KNOWN_SYMBOLS and self._token_type != TokenType.STRING:
                 # first provide the current token, as it just terminated
                 if self._token_value:
