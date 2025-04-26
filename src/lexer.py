@@ -17,7 +17,7 @@ class TokenType(Enum):
 
 @dataclass
 class Token:
-    type: TokenType
+    type: TokenType = TokenType.ID
     value: str = ""
 
 
@@ -31,6 +31,15 @@ class Lexer:
 
     def __init__(self, content: str):
         self._content = content
+
+    def next_token(self) -> Optional[Token]:
+        if self._tokens_iter is None:
+            self._tokens_iter = self._tokens()
+
+        try:
+            return next(self._tokens_iter)
+        except StopIteration:
+            return None
 
     def _tokens(self) -> Generator[Optional[Token], None, None]:
         self._token_value = ""
@@ -50,9 +59,7 @@ class Lexer:
                         i += 1
             elif next_char == "/":
                 if i + 1 < len(self._content) and self._content[i + 1] in ["/", "*"]:
-                    if self._token_value:
-                        yield from self._yield_token_and_reset()
-
+                    yield from self._yield_token_and_reset()
                     comment_type = self._CommentType.SINGLE_LINE
                     if self._content[i + 1] == "*":
                         comment_type = self._CommentType.MULTI_LINE
@@ -60,14 +67,13 @@ class Lexer:
                 else:
                     yield from self._yield_symbol(next_char)
             elif next_char == '"':
-                if self._token_type != TokenType.STRING:
+                type_before_yield = self._token_type
+                yield from self._yield_token_and_reset()
+                if type_before_yield != TokenType.STRING:
                     self._token_type = TokenType.STRING
-                else:
-                    yield from self._yield_token_and_reset()
             elif next_char.isspace() and self._token_type != TokenType.STRING:
-                if self._token_value:
-                    yield from self._yield_token_and_reset()
-            elif next_char.isnumeric() and not self._token_value:
+                yield from self._yield_token_and_reset()
+            elif next_char.isnumeric() and not self._token_value and self._token_type != TokenType.STRING:
                 if self._token_type != TokenType.INTEGER:
                     self._token_type = TokenType.INTEGER
                 self._token_value += next_char
@@ -77,13 +83,15 @@ class Lexer:
             elif next_char == "=" and self._token_type != TokenType.STRING:
                 if i + 1 < len(self._content) and self._content[i + 1] == "=":
                     i += 1
-                    yield Token(type=TokenType.SYMBOL_EQUALS, value="==")
+                    yield from self._yield_symbol("==", TokenType.SYMBOL_EQUALS)
                 else:
-                    yield Token(type=TokenType.SYMBOL, value=next_char)
+                    yield from self._yield_symbol(next_char)
             elif next_char in KNOWN_SYMBOLS and self._token_type != TokenType.STRING:
                 yield from self._yield_symbol(next_char)
             else:
                 self._token_value += next_char
+
+            self._debug_step(comment_type, next_char, i)
             i += 1
 
         if self._token_value:
@@ -91,26 +99,22 @@ class Lexer:
         else:
             yield None
 
-    def _yield_symbol(self, next_char: str) -> Generator[Token, None, None]:
+    def _yield_symbol(self, next_char: str, symbol_type: TokenType = TokenType.SYMBOL) -> Generator[Token, None, None]:
         # first provide the current token, as it just terminated
-        if self._token_value:
-            yield from self._yield_token_and_reset()
+        yield from self._yield_token_and_reset()
         # next, provide the actual symbol
-        yield Token(type=TokenType.SYMBOL, value=next_char)
+        yield Token(type=symbol_type, value=next_char)
 
     def _yield_token_and_reset(self) -> Generator[Token, None, None]:
-        yield Token(type=self._token_type, value=self._token_value)
-        self._token_value = ""
-        self._token_type = TokenType.ID
+        if self._token_value or self._token_type == TokenType.STRING:
+            yield Token(type=self._token_type, value=self._token_value)
+            self._token_value = ""
+            self._token_type = TokenType.ID
 
-    def next_token(self) -> Optional[Token]:
-        if self._tokens_iter is None:
-            self._tokens_iter = self._tokens()
-
-        try:
-            return next(self._tokens_iter)
-        except StopIteration:
-            return None
+    def _debug_step(self, comment_type, next_char, i):
+        # noinspection PyUnreachableCode
+        if False:
+            print(f"[{i}] {repr(next_char)} -> {repr(self._token_value)} {repr(self._token_type)} {' [comment]' if comment_type else ''}")
 
     class _CommentType(Enum):
         SINGLE_LINE = 1

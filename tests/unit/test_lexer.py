@@ -6,6 +6,8 @@ from lexer import Lexer, TokenType
 class TestLexer(unittest.TestCase):
     def _expect_token(self, lexer: Lexer, t_type: TokenType, value: str):
         token = lexer.next_token()
+        # print(f"   ==> {repr(token.value)} [{token.type}]")
+
         self.assertEqual(value, token.value)
         self.assertEqual(t_type, token.type)
 
@@ -47,7 +49,7 @@ class TestLexer(unittest.TestCase):
         self._expect_token(lexer, TokenType.STRING, "")
 
     def test_lexer_can_identify_string_literal_followed_by_id(self):
-        lexer = Lexer('firstWord "some string" someWord')
+        lexer = Lexer('firstWord"some string" someWord')
 
         self._expect_token(lexer, TokenType.ID, "firstWord")
         self._expect_token(lexer, TokenType.STRING, "some string")
@@ -64,6 +66,17 @@ class TestLexer(unittest.TestCase):
 
         self._expect_token(lexer, TokenType.FLOAT, "123.45")
         self._expect_token(lexer, TokenType.ID, "someWord")
+
+    def test_lexer_can_parse_numbers_in_special_situations(self):
+        lexer = Lexer('first123.45.12.34 "123 45.67" second')
+
+        self._expect_token(lexer, TokenType.ID, "first123")
+        self._expect_token(lexer, TokenType.SYMBOL, ".")
+        self._expect_token(lexer, TokenType.FLOAT, "45.12")
+        self._expect_token(lexer, TokenType.SYMBOL, ".")
+        self._expect_token(lexer, TokenType.INTEGER, "34")
+        self._expect_token(lexer, TokenType.STRING, "123 45.67")
+        self._expect_token(lexer, TokenType.ID, "second")
 
     def test_lexer_can_identify_special_symbol(self):
         lexer = Lexer('([ someWord "some string ()"')
@@ -87,6 +100,22 @@ class TestLexer(unittest.TestCase):
         self._expect_token(lexer, TokenType.SYMBOL_EQUALS, "==")
         self._expect_token(lexer, TokenType.SYMBOL, "=")
 
+    def test_lexer_distinguishes_equal_and_assignment_without_spaces(self):
+        lexer = Lexer("===")
+
+        self._expect_token(lexer, TokenType.SYMBOL_EQUALS, "==")
+        self._expect_token(lexer, TokenType.SYMBOL, "=")
+        self.assertIsNone(lexer.next_token())
+
+    def test_lexer_distinguishes_equal_and_assignment_separated_by_words(self):
+        lexer = Lexer("first==second=third")
+
+        self._expect_token(lexer, TokenType.ID, "first")
+        self._expect_token(lexer, TokenType.SYMBOL_EQUALS, "==")
+        self._expect_token(lexer, TokenType.ID, "second")
+        self._expect_token(lexer, TokenType.SYMBOL, "=")
+        self._expect_token(lexer, TokenType.ID, "third")
+
     def test_lexer_ignores_single_line_comments(self):
         lexer = Lexer("someWord // this is a comment\n anotherWord")
 
@@ -100,8 +129,6 @@ class TestLexer(unittest.TestCase):
         self._expect_token(lexer, TokenType.ID, "someWord")
         self._expect_token(lexer, TokenType.ID, "anotherWord")
         self.assertIsNone(lexer.next_token())
-
-        print('\n' * 3)
 
         lexer = Lexer("someWord // this /* (inline?) is \n\n comment */")
         self._expect_token(lexer, TokenType.ID, "someWord")
