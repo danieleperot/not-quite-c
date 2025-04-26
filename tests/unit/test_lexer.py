@@ -79,12 +79,15 @@ class TestLexer(unittest.TestCase):
         self._expect_token(lexer, TokenType.ID, "second")
 
     def test_lexer_can_identify_special_symbol(self):
-        lexer = Lexer('([ someWord "some string ()"')
+        lexer = Lexer('([ someWord "some string ()" another.word')
 
         self._expect_token(lexer, TokenType.SYMBOL, "(")
         self._expect_token(lexer, TokenType.SYMBOL, "[")
         self._expect_token(lexer, TokenType.ID, "someWord")
         self._expect_token(lexer, TokenType.STRING, "some string ()")
+        self._expect_token(lexer, TokenType.ID, "another")
+        self._expect_token(lexer, TokenType.SYMBOL, ".")
+        self._expect_token(lexer, TokenType.ID, "word")
 
     def test_lexer_identifies_all_listed_special_symbols(self):
         from lexer import KNOWN_SYMBOLS

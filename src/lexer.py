@@ -26,8 +26,7 @@ class Lexer:
     _cursor: int = 0
     _tokens_iter: Generator[Optional[Token], None, None] = None
 
-    _token_value: str = ""
-    _token_type: TokenType = TokenType.ID
+    _current: Token = Token()
 
     def __init__(self, content: str):
         self._content = content
@@ -42,8 +41,7 @@ class Lexer:
             return None
 
     def _tokens(self) -> Generator[Optional[Token], None, None]:
-        self._token_value = ""
-        self._token_type = TokenType.ID
+        self._current = Token()
         comment_type = None
         i = 0
 
@@ -67,35 +65,35 @@ class Lexer:
                 else:
                     yield from self._yield_symbol(next_char)
             elif next_char == '"':
-                type_before_yield = self._token_type
+                type_before_yield = self._current.type
                 yield from self._yield_token_and_reset()
                 if type_before_yield != TokenType.STRING:
-                    self._token_type = TokenType.STRING
-            elif next_char.isspace() and self._token_type != TokenType.STRING:
+                    self._current.type = TokenType.STRING
+            elif next_char.isspace() and self._current.type != TokenType.STRING:
                 yield from self._yield_token_and_reset()
-            elif next_char.isnumeric() and not self._token_value and self._token_type != TokenType.STRING:
-                if self._token_type != TokenType.INTEGER:
-                    self._token_type = TokenType.INTEGER
-                self._token_value += next_char
-            elif next_char == "." and self._token_type == TokenType.INTEGER:
-                self._token_type = TokenType.FLOAT
-                self._token_value += next_char
-            elif next_char == "=" and self._token_type != TokenType.STRING:
+            elif next_char.isnumeric() and not self._current.value and self._current.type != TokenType.STRING:
+                if self._current.type != TokenType.INTEGER:
+                    self._current.type = TokenType.INTEGER
+                self._current.value += next_char
+            elif next_char == "." and self._current.type == TokenType.INTEGER:
+                self._current.type = TokenType.FLOAT
+                self._current.value += next_char
+            elif next_char == "=" and self._current.type != TokenType.STRING:
                 if i + 1 < len(self._content) and self._content[i + 1] == "=":
                     i += 1
                     yield from self._yield_symbol("==", TokenType.SYMBOL_EQUALS)
                 else:
                     yield from self._yield_symbol(next_char)
-            elif next_char in KNOWN_SYMBOLS and self._token_type != TokenType.STRING:
+            elif next_char in KNOWN_SYMBOLS and self._current.type != TokenType.STRING:
                 yield from self._yield_symbol(next_char)
             else:
-                self._token_value += next_char
+                self._current.value += next_char
 
             self._debug_step(comment_type, next_char, i)
             i += 1
 
-        if self._token_value:
-            yield Token(type=self._token_type, value=self._token_value)
+        if self._current.value:
+            yield self._current
         else:
             yield None
 
@@ -106,15 +104,15 @@ class Lexer:
         yield Token(type=symbol_type, value=next_char)
 
     def _yield_token_and_reset(self) -> Generator[Token, None, None]:
-        if self._token_value or self._token_type == TokenType.STRING:
-            yield Token(type=self._token_type, value=self._token_value)
-            self._token_value = ""
-            self._token_type = TokenType.ID
+        if self._current.value or self._current.type == TokenType.STRING:
+            yield self._current
+            self._current.value = ""
+            self._current.type = TokenType.ID
 
     def _debug_step(self, comment_type, next_char, i):
         # noinspection PyUnreachableCode
         if False:
-            print(f"[{i}] {repr(next_char)} -> {repr(self._token_value)} {repr(self._token_type)} {' [comment]' if comment_type else ''}")
+            print(f"[{i}] {repr(next_char)} -> {repr(self._current.value)} {repr(self._current.type)} {' [comment]' if comment_type else ''}")
 
     class _CommentType(Enum):
         SINGLE_LINE = 1
