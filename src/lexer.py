@@ -20,12 +20,13 @@ class TokenType(Enum):
 class Position:
     line: int = 0
     column: int = 0
+    file_name: Optional[str] = None
 
     def clone(self) -> Self:
-        return Position(self.line, self.column)
+        return Position(self.line, self.column, self.file_name)
 
     def __str__(self):
-        return f"{self.line}:{self.column}"
+        return f"{self.file_name + ':' if self.file_name else ''}{self.line + 1}:{self.column + 1}"
 
 
 @dataclass
@@ -36,7 +37,7 @@ class Token:
     value: str = ""
 
     def __str__(self):
-        return f"{self.start_position}-{self.end_position}: [{self.type}] {repr(self.value)}"
+        return f"{self.start_position}: [{self.type}] {repr(self.value)} (ends: {self.end_position})"
 
 
 class Lexer:
@@ -46,11 +47,14 @@ class Lexer:
 
     _current: Token
     _position: Position
+    _file_name: Optional[str] = None
 
-    def __init__(self, content: str):
+    def __init__(self, content: str, file_name: Optional[str] = None):
         self._content = content
         self._tokens_iter = self._tokens()
-        self._position = Position()
+        self._file_name = file_name
+
+        self._position = Position(file_name=file_name)
 
     def next_token(self) -> Optional[Token]:
         try:

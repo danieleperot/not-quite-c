@@ -1,6 +1,6 @@
 import unittest
 
-from lexer import Lexer, TokenType
+from lexer import Lexer, TokenType, Position
 
 
 class TestLexer(unittest.TestCase):
@@ -188,8 +188,25 @@ class TestLexerPeek(unittest.TestCase):
 
 
 class TestTokenPosition(unittest.TestCase):
+    def test_position_has_file_name_if_lexer_accepted_it(self):
+        lexer = Lexer("firstWord")
+        self.assertEqual(None, lexer.next_token().start_position.file_name)
+
+        lexer = Lexer("firstWord", file_name="test_file")
+        token = lexer.next_token()
+        self.assertEqual("test_file", token.start_position.file_name)
+
+    def test_position_can_be_represented_as_string(self):
+        position_without_file = Position(1, 2)
+        # we sum 1 to both row and column. This way we can store the values indexing from zero, but
+        # print them in a way that is more user-friendly.
+        self.assertEqual("2:3", str(position_without_file))
+
+        position_with_file = Position(1, 2, "/home/test/test_file.txt")
+        self.assertEqual("/home/test/test_file.txt:2:3", str(position_with_file))
+
     def test_all_tokens_have_position(self):
-        lexer = Lexer("firstWord  secondWord\n\n\n thirdWord;>fourth==fifth")
+        lexer = Lexer("firstWord  secondWord\n\n\n thirdWord;>fourth==fifth", __file__)
         #  0|firstWord  secondWord
         #   |^        ^
         #   |0        9
