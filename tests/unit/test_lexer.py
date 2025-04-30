@@ -140,6 +140,16 @@ class TestLexer(unittest.TestCase):
         self._expect_token(lexer, TokenType.SYMBOL, "/")
         self.assertIsNone(lexer.next_token())
 
+    def test_token_is_deep_copied(self):
+        lexer = Lexer("first second")
+
+        first_token = lexer.next_token()
+        second_token = lexer.next_token()
+
+        self.assertEqual("first", first_token.value)
+        self.assertEqual("second", second_token.value)
+
+
 
 class TestLexerPeek(unittest.TestCase):
     def _expect_token(self, lexer: Lexer, t_type: TokenType, value: str):
@@ -165,3 +175,13 @@ class TestLexerPeek(unittest.TestCase):
 
         self.assertIsNone(lexer.peek_token())
         self.assertIsNone(lexer.next_token())
+
+    def test_token_is_deep_copied(self):
+        lexer = Lexer("first second")
+
+        first_token = lexer.peek_token()
+        lexer.next_token()
+        second_token = lexer.peek_token()
+
+        self.assertEqual("first", first_token.value)
+        self.assertEqual("second", second_token.value)

@@ -1,3 +1,4 @@
+from copy import deepcopy
 from dataclasses import dataclass
 from enum import Enum
 from typing import Generator, Optional
@@ -27,7 +28,6 @@ class Lexer:
     _tokens_iter: Generator[Optional[Token], None, None] = None
 
     _current: Token = Token()
-    _cursor: int = 0
 
     def __init__(self, content: str):
         self._content = content
@@ -35,7 +35,7 @@ class Lexer:
 
     def next_token(self) -> Optional[Token]:
         try:
-            return next(self._tokens_iter)
+            return deepcopy(next(self._tokens_iter))
         except StopIteration:
             return None
 
