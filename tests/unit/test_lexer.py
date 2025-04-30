@@ -185,3 +185,47 @@ class TestLexerPeek(unittest.TestCase):
 
         self.assertEqual("first", first_token.value)
         self.assertEqual("second", second_token.value)
+
+
+class TestTokenPosition(unittest.TestCase):
+    def test_all_tokens_have_position(self):
+        lexer = Lexer("firstWord  secondWord\n\n\n thirdWord;>fourth==fifth")
+        #  0|firstWord  secondWord
+        #   |^        ^
+        #   |0        9
+        #===============================
+        #  0|firstWord  secondWord
+        #   |           ^         ^
+        #   |           11        21
+        #===============================
+        #  0|firstWord  secondWord
+        #  1|
+        #  2|
+        #  3| thirdWord;>fourth==fifth
+        #   |          ^^
+        #   |          10
+        #   |           11
+
+        tokens = [
+            { "value": "firstWord", "start": (0, 0), "end": (0, 9) },
+            { "value": "secondWord", "start": (0, 11), "end": (0, 21) },
+            { "value": "thirdWord", "start": (3, 1), "end": (3, 10) },
+            { "value": ";", "start": (3, 10), "end": (3, 11) },
+            { "value": ">", "start": (3, 11), "end": (3, 12) },
+            { "value": "fourth", "start": (3, 12), "end": (3, 18) },
+            { "value": "==", "start": (3, 18), "end": (3, 20) },
+            { "value": "fifth", "start": (3, 20), "end": (3, 25) },
+        ]
+
+        for expected in tokens:
+            token = lexer.next_token()
+            self.assertEqual(expected["value"], token.value)
+            self.assertEqual(token.end_position.column - token.start_position.column, len(token.value))
+            self.assertEqual(expected["end"][1] - expected["start"][1], len(token.value))
+            self.assertEqual(expected["start"][0], token.start_position.line)
+            self.assertEqual(expected["start"][1], token.start_position.column)
+            self.assertEqual(expected["end"][0], token.end_position.line)
+            self.assertEqual(expected["end"][1], token.end_position.column)
+
+    def test_peek_does_not_interfere_with_position(self):
+        assert False, f"TODO!"
