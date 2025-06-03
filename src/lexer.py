@@ -41,135 +41,145 @@ class Token:
 
 
 class Lexer:
-    _content: str
-    _cursor: int = 0
-    _tokens_iter: Generator[Optional[Token], None, None] = None
-
-    _current: Token
-    _position: Position
-    _file_name: Optional[str] = None
-
     def __init__(self, content: str, file_name: Optional[str] = None):
         self._content = content
-        self._tokens_iter = self._tokens()
         self._file_name = file_name
-
         self._position = Position(file_name=file_name)
+        self._cursor = 0
+        self._tokens_generated = []
+        self._current_token_index = 0
 
     def next_token(self) -> Optional[Token]:
-        try:
-            return deepcopy(next(self._tokens_iter))
-        except StopIteration:
-            return None
+        # Generate tokens if not already generated
+        if not self._tokens_generated:
+            self._tokens_generated = list(self._generate_tokens())
+        
+        # Return next token if available
+        if self._current_token_index < len(self._tokens_generated):
+            token = deepcopy(self._tokens_generated[self._current_token_index])
+            self._current_token_index += 1
+            return token
+        return None
 
     def peek_token(self) -> Optional[Token]:
-        try:
-            current_cursor = self._cursor
-            token = next(self._tokens(self._cursor))
-            self._cursor = current_cursor
-
-            return token
-        except StopIteration:
-            return None
-
-    def _tokens(self, cursor: int = 0) -> Generator[Optional[Token], None, None]:
-        self._current = Token(start_position=self._position.clone(), end_position=Position())
+        # Generate tokens if not already generated
+        if not self._tokens_generated:
+            self._tokens_generated = list(self._generate_tokens())
+        
+        # Return current token without advancing
+        if self._current_token_index < len(self._tokens_generated):
+            return deepcopy(self._tokens_generated[self._current_token_index])
+        return None
+        
+    def _generate_tokens(self) -> Generator[Token, None, None]:
+        position = Position(file_name=self._file_name)
+        current = Token(start_position=position.clone(), end_position=Position())
+        cursor = 0
         comment_type = None
-        self._cursor = cursor
 
-        while self._cursor < len(self._content):
-            next_char = "" if self._cursor == len(self._content) else str(self._content[self._cursor])
+        while cursor < len(self._content):
+            next_char = self._content[cursor] if cursor < len(self._content) else ""
 
             # Start counting position only at the last whitespace
-            if not next_char.isspace() and self._current.start_position is None:
-                self._current.start_position = self._position.clone()
+            if not next_char.isspace() and current.start_position is None:
+                current.start_position = position.clone()
 
             if comment_type:
                 if next_char == "\n" and comment_type == self._CommentType.SINGLE_LINE:
                     comment_type = None
-                if next_char == "*" and comment_type == self._CommentType.MULTI_LINE:
-                    if self._cursor + 1 < len(self._content) and self._content[self._cursor + 1] == "/":
+                elif next_char == "*" and comment_type == self._CommentType.MULTI_LINE:
+                    if cursor + 1 < len(self._content) and self._content[cursor + 1] == "/":
                         comment_type = None
-                        self._advance(next_char)
+                        cursor += 1
+                        if next_char == "\n":
+                            position.line += 1
+                            position.column = 0
+                        else:
+                            position.column += 1
             elif next_char == "/":
-                if self._cursor + 1 < len(self._content) and self._content[self._cursor + 1] in ["/", "*"]:
-                    yield from self._yield_token_and_reset()
+                if cursor + 1 < len(self._content) and self._content[cursor + 1] in ["/", "*"]:
+                    for token in self._yield_token_and_reset(current, position):
+                        yield token
+                        current = Token(start_position=None, end_position=Position())
                     comment_type = self._CommentType.SINGLE_LINE
-                    if self._content[self._cursor + 1] == "*":
+                    if self._content[cursor + 1] == "*":
                         comment_type = self._CommentType.MULTI_LINE
-                    self._advance(next_char)
+                    cursor += 1
+                    position.column += 1
                 else:
-                    yield from self._yield_symbol(next_char)
+                    for token in self._yield_symbol(current, position, next_char):
+                        yield token
+                        current = Token(start_position=None, end_position=Position())
             elif next_char == '"':
-                type_before_yield = self._current.type
-                yield from self._yield_token_and_reset()
+                type_before_yield = current.type
+                for token in self._yield_token_and_reset(current, position):
+                    yield token
+                    current = Token(start_position=None, end_position=Position())
                 if type_before_yield != TokenType.STRING:
-                    self._current.type = TokenType.STRING
-            elif next_char.isspace() and self._current.type != TokenType.STRING:
-                yield from self._yield_token_and_reset()
-            elif next_char.isnumeric() and not self._current.value and self._current.type != TokenType.STRING:
-                if self._current.type != TokenType.INTEGER:
-                    self._current.type = TokenType.INTEGER
-                self._current.value += next_char
-            elif next_char == "." and self._current.type == TokenType.INTEGER:
-                self._current.type = TokenType.FLOAT
-                self._current.value += next_char
-            elif next_char == "=" and self._current.type != TokenType.STRING:
-                if self._cursor + 1 < len(self._content) and self._content[self._cursor + 1] == "=":
-                    yield from self._yield_symbol("==", TokenType.SYMBOL_EQUALS)
-                    self._advance(next_char)
+                    current.type = TokenType.STRING
+                    current.start_position = position.clone()
+            elif next_char.isspace() and current.type != TokenType.STRING:
+                for token in self._yield_token_and_reset(current, position):
+                    yield token
+                    current = Token(start_position=None, end_position=Position())
+            elif next_char.isnumeric() and not current.value and current.type != TokenType.STRING:
+                if current.type != TokenType.INTEGER:
+                    current.type = TokenType.INTEGER
+                    current.start_position = position.clone()
+                current.value += next_char
+            elif next_char == "." and current.type == TokenType.INTEGER:
+                current.type = TokenType.FLOAT
+                current.value += next_char
+            elif next_char == "=" and current.type != TokenType.STRING:
+                if cursor + 1 < len(self._content) and self._content[cursor + 1] == "=":
+                    for token in self._yield_symbol(current, position, "==", TokenType.SYMBOL_EQUALS):
+                        yield token
+                        current = Token(start_position=None, end_position=Position())
+                    cursor += 1
+                    position.column += 1
                 else:
-                    yield from self._yield_symbol(next_char)
-            elif next_char in KNOWN_SYMBOLS and self._current.type != TokenType.STRING:
-                yield from self._yield_symbol(next_char)
+                    for token in self._yield_symbol(current, position, next_char):
+                        yield token
+                        current = Token(start_position=None, end_position=Position())
+            elif next_char in KNOWN_SYMBOLS and current.type != TokenType.STRING:
+                for token in self._yield_symbol(current, position, next_char):
+                    yield token
+                    current = Token(start_position=None, end_position=Position())
             else:
-                self._current.value += next_char
+                if current.start_position is None:
+                    current.start_position = position.clone()
+                current.value += next_char
 
-            self._debug_step(comment_type, next_char, self._cursor)
-            self._advance(next_char)
+            cursor += 1
+            if next_char == "\n":
+                position.line += 1
+                position.column = 0
+            else:
+                position.column += 1
 
-        if self._current.value:
-            self._current.end_position = self._position.clone()
-            yield self._current
-        else:
-            yield None
+        if current.value:
+            current.end_position = position.clone()
+            yield deepcopy(current)
 
-    def _advance(self, next_char: str):
-        self._cursor += 1
-        if next_char == "\n":
-            self._position.line += 1
-            self._position.column = 0
-        else:
-            self._position.column += 1
+    def _yield_symbol(self, current: Token, position: Position, symbol: str, 
+                     symbol_type: TokenType = TokenType.SYMBOL) -> Generator[Token, None, None]:
+        # Yield any pending token
+        for token in self._yield_token_and_reset(current, position):
+            yield token
+        
+        # Create a new token for the symbol
+        symbol_token = Token(
+            start_position=position.clone(),
+            end_position=Position(position.line, position.column + len(symbol), position.file_name),
+            type=symbol_type,
+            value=symbol
+        )
+        yield deepcopy(symbol_token)
 
-
-    def _yield_symbol(self, next_char: str, symbol_type: TokenType = TokenType.SYMBOL) -> Generator[Token, None, None]:
-        # first provide the current token, as it just terminated
-        yield from self._yield_token_and_reset()
-
-        # next, provide the actual symbol
-        self._current.type = symbol_type
-        self._current.value = next_char
-        self._current.start_position = self._position.clone()
-        self._current.end_position = self._position.clone()
-        self._current.end_position.column += len(next_char)
-
-        yield from self._yield_token_and_reset(skip_end=True)
-
-    def _yield_token_and_reset(self, skip_end: bool = False) -> Generator[Token, None, None]:
-        if self._current.value or self._current.type == TokenType.STRING:
-            if not skip_end:
-                self._current.end_position = self._position.clone()
-
-            yield self._current
-            self._current.start_position = None
-            self._current.value = ""
-            self._current.type = TokenType.ID
-
-    def _debug_step(self, comment_type, next_char, i):
-        # noinspection PyUnreachableCode
-        if False:
-            print(f"[{i} - {self._position}] {repr(next_char)} -> {self._current} {' [comment]' if comment_type else ''}")
+    def _yield_token_and_reset(self, current: Token, position: Position) -> Generator[Token, None, None]:
+        if current.value or current.type == TokenType.STRING:
+            current.end_position = position.clone()
+            yield deepcopy(current)
 
     class _CommentType(Enum):
         SINGLE_LINE = 1

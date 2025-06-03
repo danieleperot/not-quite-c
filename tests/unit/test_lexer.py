@@ -245,4 +245,22 @@ class TestTokenPosition(unittest.TestCase):
             self.assertEqual(expected["end"][1], token.end_position.column)
 
     def test_peek_does_not_interfere_with_position(self):
-        assert False, f"TODO!"
+        lexer = Lexer("first second third")
+        # Position should be at the start (0,0) before any operations
+        self.assertEqual(0, lexer._position.line)
+        self.assertEqual(0, lexer._position.column)
+
+        token_peek = lexer.peek_token()
+        # Assert the peeked token has the expected value
+        self.assertEqual("first", token_peek.value)
+        self.assertEqual(TokenType.ID, token_peek.type)
+
+        # Position should remain at (0,0) after peek
+        self.assertEqual(0, lexer._position.line)
+        self.assertEqual(0, lexer._position.column)
+
+        token_next = lexer.next_token()
+        # Verify token values match
+        self.assertEqual("first", token_next.value)
+        self.assertEqual(TokenType.ID, token_next.type)
+        self.assertEqual(token_peek.value, token_next.value)
